@@ -21,15 +21,31 @@ const zoomLevel = ref(6000);
 const centerX = ref(300);
 const centerY = ref(300);
 
-// TODO: Compensate for center dragging
 function onMouseWheel(event_: Event) {
   const event: WheelEvent = event_ as WheelEvent;
   if (event.deltaY < 0) {
-    zoomLevel.value *= 1.1;
+    increaseZoomLevel();
   }
   if (event.deltaY > 0) {
-    zoomLevel.value /= 1.1;
+    decreaseZoomLevel();
   }
+}
+
+function onDOMMouseScroll(event: any) {
+  if (event.detail < 0) {
+    increaseZoomLevel();
+  }
+  if (event.detail > 0) {
+    decreaseZoomLevel();
+  }
+}
+
+function increaseZoomLevel() {
+  zoomLevel.value *= 1.1;
+}
+
+function decreaseZoomLevel() {
+  zoomLevel.value /= 1.1;
 }
 
 const dragStart = {
@@ -61,15 +77,33 @@ function onMouseUp(event: MouseEvent) {
   dragStart.active = false;
 }
 
+//FF doesn't recognize mousewheel as of FF3.x
+const mousewheelevt = /Firefox/i.test(navigator.userAgent)
+  ? "DOMMouseScroll"
+  : "mousewheel";
+const onMouseWheelEvt = /Firefox/i.test(navigator.userAgent)
+  ? onDOMMouseScroll
+  : onMouseWheel;
+
 onMounted(() => {
-  window.addEventListener("mousewheel", onMouseWheel);
+  if ("attachEvent" in document)
+    //if IE (and Opera depending on user setting)
+    (document as any).attachEvent("on" + mousewheelevt, onMouseWheel);
+  else if (document.addEventListener)
+    //WC3 browsers
+    document.addEventListener(mousewheelevt, onMouseWheelEvt, false);
   window.addEventListener("mousedown", onMouseDown);
   window.addEventListener("mousemove", onMouseMove);
   window.addEventListener("mouseup", onMouseUp);
 });
 
 onUnmounted(() => {
-  window.removeEventListener("mousewheel", onMouseWheel);
+  if ("detachEvent" in document)
+    //if IE (and Opera depending on user setting)
+    (document as any).detachEvent("on" + mousewheelevt, onMouseWheel);
+  else if (document.removeEventListener)
+    //WC3 browsers
+    document.removeEventListener(mousewheelevt, onMouseWheelEvt, false);
   window.removeEventListener("mousedown", onMouseDown);
   window.removeEventListener("mousemove", onMouseMove);
   window.removeEventListener("mouseup", onMouseUp);
@@ -106,7 +140,8 @@ const points = computed(() => {
     let a = val[0] * metric[0];
     let b = val[1] * metric[1];
     let c = val[2] * metric[2];
-    const normalizer = 1 / Math.sqrt(a * a + b * b + c * c);
+    // This is the projective norm. Works correctly even if vals get flipped.
+    const normalizer = 1 / (a + b + c);
 
     a *= normalizer;
     b *= normalizer;
@@ -153,6 +188,19 @@ const lines = computed(() => {
   return main.concat(bonus0).concat(bonus1);
 });
 
+function cleanVal(val: number[]): void {
+  const commonFactor = val.reduce(gcd);
+  for (let k = 0; k < val.length; ++k) {
+    val[k] /= commonFactor;
+  }
+  const norm = val[0] + val[1] + val[2];
+  if (norm < 0) {
+    for (let k = 0; k < val.length; ++k) {
+      val[k] = -val[k];
+    }
+  }
+}
+
 function select(index: number) {
   if (selected.value < 0) {
     selected.value = index;
@@ -183,7 +231,7 @@ const te = reactive({
 });
 const pote = reactive({
   period: 1200.0,
-  generator: (Math.log(3) / Math.LN2) * 1200.0,
+  generator: (Math.log(1.5) / Math.LN2) * 1200.0,
 });
 
 function nameTemperament(pair: [number, number]) {
@@ -192,6 +240,14 @@ function nameTemperament(pair: [number, number]) {
     [vals[pair[0]], vals[pair[1]]],
     sg
   );
+  if (temperament.isNil()) {
+    temperamentName.value = "Nil";
+    te.period = 0;
+    te.generator = 0;
+    pote.period = 0;
+    pote.generator = 0;
+    return;
+  }
   temperament.canonize();
   const prefix = temperament.rank2Prefix();
   const recovered = Temperament.recoverRank2(prefix, sg);
@@ -203,13 +259,28 @@ function nameTemperament(pair: [number, number]) {
     } else {
       temperamentName.value = "???";
     }
+  } else {
+    temperamentName.value = "???";
   }
   const tuning = temperament.toTenneyEuclid();
-  const [divisions, generator] = temperament.divisionsGenerator();
-  te.period = natsToCents(tuning[0] / divisions);
-  te.generator = mmod(natsToCents(dot(tuning, generator)), te.period);
-  pote.period = 1200 / divisions;
-  pote.generator = (te.generator / tuning[0]) * Math.LN2;
+  let [divisions, generator] = temperament.divisionsGenerator();
+  if (divisions !== 0) {
+    te.period = natsToCents(tuning[0] / divisions);
+    te.generator = Math.min(
+      mmod(natsToCents(dot(tuning, generator)), te.period),
+      mmod(-natsToCents(dot(tuning, generator)), te.period)
+    );
+    pote.period = 1200 / Math.abs(divisions);
+    pote.generator = Math.abs((Math.LN2 / tuning[0]) * te.generator);
+  } else {
+    // Tempered out the octave, we're in 3.5 now.
+    divisions = temperament.value[6];
+    te.period = natsToCents(Math.log(3) / divisions);
+    te.generator = natsToCents(Math.log(5 / 3));
+    pote.period = te.period;
+    pote.generator = Math.abs(te.generator);
+    temperamentName.value = "Just Intonation (3.5)";
+  }
 }
 
 function checkIntersections() {
@@ -225,19 +296,11 @@ function checkIntersections() {
   for (let i = 0; i < wedgies.length; ++i) {
     for (let j = 0; j < wedgies.length; ++j) {
       const intersection = wedgies[i].Vee(wedgies[j]);
-      if (intersection[1] < 0) {
-        for (let k = 0; k < intersection.length; ++k) {
-          intersection[k] = -intersection[k];
-        }
-      }
-      const val = [...intersection.slice(1, 4)];
+      const val = [intersection[1], intersection[2], intersection[3]];
       if (!val[0] && !val[1] && !val[2]) {
         continue;
       }
-      const commonFactor = val.reduce(gcd);
-      for (let k = 0; k < val.length; ++k) {
-        val[k] = Math.round(val[k] / commonFactor);
-      }
+      cleanVal(val);
       let novel = true;
       vals.forEach((v) => {
         if (v[0] === val[0] && v[1] === val[1] && v[2] === val[2]) {
