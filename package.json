@@ -10,6 +10,7 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
   },
   "dependencies": {
+    "ganja.js": "^1.0.194",
     "temperaments": "github:frostburn/temperaments",
     "vue": "^3.2.33",
     "vue-router": "^4.0.14"

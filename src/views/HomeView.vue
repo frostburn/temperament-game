@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import Game from '@/components/Game.vue'
+import GameSpace from "@/components/GameSpace.vue";
 </script>
 
 <template>
   <main>
-    <Game msg="Hello"/>
+    <GameSpace subgroup="2.3.5" />
   </main>
 </template>

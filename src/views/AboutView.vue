@@ -1,6 +1,10 @@
 <template>
   <div class="about">
-    <h1>This is an about page</h1>
+    <div class="stuff">
+      <h1>Temperament game by frostburn</h1>
+      <h2>Made using temperaments for js</h2>
+      <a href="https://github.com/frostburn/temperaments">Fork it on Github</a>
+    </div>
   </div>
 </template>
 
