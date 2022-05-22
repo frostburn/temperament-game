@@ -14,7 +14,7 @@ import HelloWorld from "@/components/HelloWorld.vue";
     />
 
     <div class="wrapper">
-      <HelloWorld msg="Projective Tuning Space Game" />
+      <HelloWorld msg='Projective Tuning Space "Game"' />
 
       <nav>
         <RouterLink to="/">Home</RouterLink>
@@ -92,8 +92,6 @@ nav a:first-of-type {
   }
 
   #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
     padding: 0 2rem;
   }
 
