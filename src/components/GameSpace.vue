@@ -4,7 +4,7 @@ import Algebra from "ganja.js";
 import {
   dot,
   gcd,
-  getRank2Name,
+  getSingleCommaName,
   inverseLogMetric,
   mmod,
   natsToCents,
@@ -18,8 +18,8 @@ defineProps<{
 }>();
 
 const zoomLevel = ref(6000);
-const centerX = ref(300);
-const centerY = ref(300);
+const centerX = ref(0);
+const centerY = ref(0);
 
 function onMouseWheel(event_: Event) {
   const event: WheelEvent = event_ as WheelEvent;
@@ -49,8 +49,8 @@ function decreaseZoomLevel() {
 }
 
 const dragStart = {
-  x: 300,
-  y: 300,
+  x: 0,
+  y: 0,
   screenX: 0,
   screenY: 0,
   active: false,
@@ -68,8 +68,8 @@ function onMouseMove(event: MouseEvent) {
   if (!dragStart.active) {
     return;
   }
-  centerX.value = dragStart.x - dragStart.screenX + event.screenX;
-  centerY.value = dragStart.y - dragStart.screenY + event.screenY;
+  centerX.value = dragStart.x + (dragStart.screenX - event.screenX) / zoomLevel.value;
+  centerY.value = dragStart.y + (dragStart.screenY - event.screenY) / zoomLevel.value;
 }
 
 function onMouseUp(event: MouseEvent) {
@@ -149,8 +149,8 @@ const points = computed(() => {
     const x = 0.5 * (a + b) - c;
     const y = (a - b) * diagonalYScale;
     return {
-      x: x * zoomLevel.value + centerX.value,
-      y: y * zoomLevel.value + centerY.value,
+      x: (x - centerX.value) * zoomLevel.value + 450,
+      y: (y - centerY.value) * zoomLevel.value + 270,
       fill: index === selected.value ? "green" : "black",
     };
   });
@@ -224,7 +224,7 @@ function select(index: number) {
   }
 }
 
-const temperamentName = ref("Just Intonation");
+const temperamentName = ref("Ya");
 const te = reactive({
   period: 1200.0,
   generator: (Math.log(3) / Math.LN2) * 1200.0,
@@ -249,19 +249,8 @@ function nameTemperament(pair: [number, number]) {
     return;
   }
   temperament.canonize();
-  const prefix = temperament.rank2Prefix();
-  const recovered = Temperament.recoverRank2(prefix, sg);
-  recovered.canonize();
-  if (temperament.equals(recovered)) {
-    const maybeName = getRank2Name(sg, prefix);
-    if (maybeName !== undefined) {
-      temperamentName.value = maybeName;
-    } else {
-      temperamentName.value = "???";
-    }
-  } else {
-    temperamentName.value = "???";
-  }
+  const name = getSingleCommaName(temperament);
+  temperamentName.value = name.given || name.color || "???";
   const tuning = temperament.toTenneyEuclid();
   let [divisions, generator] = temperament.divisionsGenerator();
   if (divisions !== 0) {
@@ -279,7 +268,6 @@ function nameTemperament(pair: [number, number]) {
     te.generator = natsToCents(Math.log(5 / 3));
     pote.period = te.period;
     pote.generator = Math.abs(te.generator);
-    temperamentName.value = "Just Intonation (3.5)";
   }
 }
 
