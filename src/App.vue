@@ -1,9 +1,30 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from "vue-router";
 import HelloWorld from "@/components/HelloWorld.vue";
-import { ref } from "vue";
+import { reactive, ref } from "vue";
 
+const subgroup = reactive([0, 1, 2]);
 const showWarts = ref(false);
+
+function selectSubgroup(event: Event) {
+  while (subgroup.length) {
+    subgroup.pop();
+  }
+  const value = (event.target as HTMLSelectElement)!.value;
+  if (value === "2.3.7") {
+    subgroup.push(0);
+    subgroup.push(1);
+    subgroup.push(3);
+  } else if (value === "2.5.7") {
+    subgroup.push(0);
+    subgroup.push(2);
+    subgroup.push(3);
+  } else {
+    subgroup.push(0);
+    subgroup.push(1);
+    subgroup.push(2);
+  }
+}
 </script>
 
 <template>
@@ -21,6 +42,13 @@ const showWarts = ref(false);
       <div>
         <label for="show-warts">Show warts </label>
         <input id="show-warts" type="checkbox" v-model="showWarts" />
+
+        <label for="subgroup"> Subgroup </label>
+        <select id="subgroup" @change="selectSubgroup">
+          <option>5-limit</option>
+          <option>2.3.7</option>
+          <option>2.5.7</option>
+        </select>
       </div>
 
       <nav>
@@ -30,7 +58,7 @@ const showWarts = ref(false);
     </div>
   </header>
 
-  <RouterView subgroup="2.3.5" :showWarts="showWarts" />
+  <RouterView :subgroup="subgroup" :showWarts="showWarts" />
 </template>
 
 <style>

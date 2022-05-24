@@ -2,7 +2,7 @@
 import GameSpace from "@/components/GameSpace.vue";
 
 defineProps<{
-  subgroup: string;
+  subgroup: number[];
   showWarts: boolean;
 }>();
 </script>

@@ -9,15 +9,20 @@ import {
   mmod,
   natsToCents,
   patentVal,
+  PRIMES,
   Temperament,
 } from "temperaments";
 import { toWarts } from "temperaments/dist/src/temperament";
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 
 const props = defineProps<{
-  subgroup: string;
+  subgroup: number[];
   showWarts: boolean;
 }>();
+
+const subgroupStr = computed(() => {
+  return props.subgroup.map((i) => PRIMES[i]).join(".");
+});
 
 const zoomLevel = ref(6000);
 const centerX = ref(0);
@@ -70,10 +75,14 @@ function onMouseMove(event: MouseEvent) {
   if (!dragStart.active) {
     return;
   }
-  centerX.value =
-    dragStart.x + (dragStart.screenX - event.screenX) / zoomLevel.value;
-  centerY.value =
-    dragStart.y + (dragStart.screenY - event.screenY) / zoomLevel.value;
+  const deltaX = dragStart.screenX - event.screenX;
+  const deltaY = dragStart.screenY - event.screenY;
+  // TODO: Figure out why the screen jerks
+  // if (Math.hypot(deltaX, deltaY) < 5) {
+  //   return;
+  // }
+  centerX.value = dragStart.x + deltaX / zoomLevel.value;
+  centerY.value = dragStart.y + deltaY / zoomLevel.value;
 }
 
 function onMouseUp(event: MouseEvent) {
@@ -115,12 +124,6 @@ onUnmounted(() => {
 
 const Cl3 = Algebra(3);
 
-const edo3 = patentVal(3, 2, 3);
-const edo4 = patentVal(4, 2, 3);
-const edo5 = patentVal(5, 2, 3);
-const edo12 = patentVal(12, 2, 3);
-
-const vals = reactive([edo3, edo4, edo5, edo12]);
 const selected = ref(-1);
 const mouseOverLabel = reactive({
   text: "N/A",
@@ -129,12 +132,52 @@ const mouseOverLabel = reactive({
   y: 0,
   index: -1,
 });
+const temperamentName = ref("Ya");
 
-const valPairs = reactive([
-  [0, 1],
-  [0, 2],
-  [1, 2],
-]);
+const vals: number[][] = reactive([]);
+const valPairs: number[][] = reactive([]);
+
+watch(
+  props.subgroup,
+  (newValue) => {
+    const numComponents = newValue.reduce((a, b) => Math.max(a, b)) + 1;
+    const edo3 = patentVal(3, 2, numComponents);
+    const edo4 = patentVal(4, 2, numComponents);
+    const edo5 = patentVal(5, 2, numComponents);
+    const middle = patentVal(15 - numComponents, 2, numComponents);
+
+    while (vals.length) {
+      vals.pop();
+    }
+    vals.push(edo3);
+    vals.push(edo4);
+    vals.push(edo5);
+    vals.push(middle);
+
+    while (valPairs.length) {
+      valPairs.pop();
+    }
+
+    valPairs.push([0, 1]);
+    valPairs.push([0, 2]);
+    valPairs.push([1, 2]);
+
+    zoomLevel.value = 6000;
+    centerX.value = 0;
+    centerY.value = 0;
+    selected.value = -1;
+    if (numComponents === 3) {
+      temperamentName.value = "Ya";
+    } else {
+      if (newValue[1] === 2) {
+        temperamentName.value = "Yaza";
+      } else {
+        temperamentName.value = "Za";
+      }
+    }
+  },
+  { immediate: true }
+);
 
 const diagonalYScale = Math.sqrt(0.75);
 
@@ -142,11 +185,12 @@ const screenCenterX = 450;
 const screenCenterY = 270;
 
 const points = computed(() => {
-  const metric = inverseLogMetric([0, 1, 2]);
+  const metric = inverseLogMetric(props.subgroup);
   return vals.map((val, index) => {
-    let a = val[0] * metric[0];
-    let b = val[1] * metric[1];
-    let c = val[2] * metric[2];
+    const sg = props.subgroup;
+    let a = val[sg[0]] * metric[0];
+    let b = val[sg[1]] * metric[1];
+    let c = val[sg[2]] * metric[2];
     // This is the projective norm. Works correctly even if vals get flipped.
     const normalizer = 1 / (a + b + c);
 
@@ -202,7 +246,7 @@ const lines = computed(() => {
   return main.concat(bonus0).concat(bonus1);
 });
 
-function cleanVal(val: number[]): void {
+function cleanVal(val: number[]): number[] {
   const commonFactor = val.reduce(gcd);
   for (let k = 0; k < val.length; ++k) {
     val[k] /= commonFactor;
@@ -213,6 +257,10 @@ function cleanVal(val: number[]): void {
       val[k] = -val[k];
     }
   }
+  const numComponents = props.subgroup.reduce((a, b) => Math.max(a, b)) + 1;
+  const result = patentVal(val[0], 2, numComponents);
+  props.subgroup.forEach((index, i) => (result[index] = val[i]));
+  return result;
 }
 
 function select(index: number) {
@@ -238,7 +286,6 @@ function select(index: number) {
   }
 }
 
-const temperamentName = ref("Ya");
 const te = reactive({
   period: 1200.0,
   generator: (Math.log(3) / Math.LN2) * 1200.0,
@@ -249,7 +296,7 @@ const pote = reactive({
 });
 
 function nameTemperament(pair: [number, number]) {
-  const sg = [0, 1, 2];
+  const sg = props.subgroup;
   const temperament = Temperament.fromValList(
     [vals[pair[0]], vals[pair[1]]],
     sg
@@ -286,7 +333,10 @@ function nameTemperament(pair: [number, number]) {
 }
 
 function checkIntersections() {
-  const vectors = vals.map((val) => {
+  const sg = props.subgroup;
+
+  const vectors = vals.map((val_) => {
+    const val = sg.map((i) => val_[i]);
     const vector = Array(8).fill(0);
     vector.splice(1, 3, ...val);
     return new Cl3(vector);
@@ -302,15 +352,19 @@ function checkIntersections() {
       if (!val[0] && !val[1] && !val[2]) {
         continue;
       }
-      cleanVal(val);
+      const v1 = cleanVal(val);
       let novel = true;
       vals.forEach((v) => {
-        if (v[0] === val[0] && v[1] === val[1] && v[2] === val[2]) {
+        if (
+          v[sg[0]] === v1[sg[0]] &&
+          v[sg[1]] === v1[sg[1]] &&
+          v[sg[2]] === v1[sg[2]]
+        ) {
           novel = false;
         }
       });
       if (novel) {
-        vals.push(val);
+        vals.push(v1);
       }
     }
   }
@@ -337,7 +391,7 @@ function clearMouseOverLabel(index: number) {
 
 <template>
   <div class="greetings">
-    <h1 class="green">{{ subgroup }} : {{ temperamentName }}</h1>
+    <h1 class="green">{{ subgroupStr }} : {{ temperamentName }}</h1>
     <svg class="game">
       <rect
         :x="center.x - 2.5"
