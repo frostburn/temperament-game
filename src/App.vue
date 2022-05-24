@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from "vue-router";
 import HelloWorld from "@/components/HelloWorld.vue";
+import { ref } from "vue";
+
+const showWarts = ref(false);
 </script>
 
 <template>
@@ -15,6 +18,10 @@ import HelloWorld from "@/components/HelloWorld.vue";
 
     <div class="wrapper">
       <HelloWorld msg='Projective Tuning Space "Game"' />
+      <div>
+        <label for="show-warts">Show warts </label>
+        <input id="show-warts" type="checkbox" v-model="showWarts" />
+      </div>
 
       <nav>
         <RouterLink to="/">Home</RouterLink>
@@ -23,7 +30,7 @@ import HelloWorld from "@/components/HelloWorld.vue";
     </div>
   </header>
 
-  <RouterView />
+  <RouterView subgroup="2.3.5" :showWarts="showWarts" />
 </template>
 
 <style>
@@ -99,12 +106,6 @@ nav a:first-of-type {
     display: flex;
     place-items: center;
     padding-right: calc(var(--section-gap) / 2);
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
   }
 
   .logo {

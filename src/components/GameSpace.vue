@@ -11,10 +11,12 @@ import {
   patentVal,
   Temperament,
 } from "temperaments";
+import { toWarts } from "temperaments/dist/src/temperament";
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 
-defineProps<{
+const props = defineProps<{
   subgroup: string;
+  showWarts: boolean;
 }>();
 
 const zoomLevel = ref(6000);
@@ -68,8 +70,10 @@ function onMouseMove(event: MouseEvent) {
   if (!dragStart.active) {
     return;
   }
-  centerX.value = dragStart.x + (dragStart.screenX - event.screenX) / zoomLevel.value;
-  centerY.value = dragStart.y + (dragStart.screenY - event.screenY) / zoomLevel.value;
+  centerX.value =
+    dragStart.x + (dragStart.screenX - event.screenX) / zoomLevel.value;
+  centerY.value =
+    dragStart.y + (dragStart.screenY - event.screenY) / zoomLevel.value;
 }
 
 function onMouseUp(event: MouseEvent) {
@@ -134,6 +138,9 @@ const valPairs = reactive([
 
 const diagonalYScale = Math.sqrt(0.75);
 
+const screenCenterX = 450;
+const screenCenterY = 270;
+
 const points = computed(() => {
   const metric = inverseLogMetric([0, 1, 2]);
   return vals.map((val, index) => {
@@ -149,11 +156,18 @@ const points = computed(() => {
     const x = 0.5 * (a + b) - c;
     const y = (a - b) * diagonalYScale;
     return {
-      x: (x - centerX.value) * zoomLevel.value + 450,
-      y: (y - centerY.value) * zoomLevel.value + 270,
+      x: (x - centerX.value) * zoomLevel.value + screenCenterX,
+      y: (y - centerY.value) * zoomLevel.value + screenCenterY,
       fill: index === selected.value ? "green" : "black",
     };
   });
+});
+
+const center = computed(() => {
+  return {
+    x: screenCenterX - centerX.value * zoomLevel.value,
+    y: screenCenterY - centerY.value * zoomLevel.value,
+  };
 });
 
 const lines = computed(() => {
@@ -303,7 +317,11 @@ function checkIntersections() {
 }
 
 function setMouseOverLabel(index: number) {
-  mouseOverLabel.text = vals[index][0].toString();
+  if (props.showWarts) {
+    mouseOverLabel.text = toWarts(vals[index]);
+  } else {
+    mouseOverLabel.text = vals[index][0].toString();
+  }
   mouseOverLabel.x = points.value[index].x + 5;
   mouseOverLabel.y = points.value[index].y - 5;
   mouseOverLabel.index = index;
@@ -321,6 +339,23 @@ function clearMouseOverLabel(index: number) {
   <div class="greetings">
     <h1 class="green">{{ subgroup }} : {{ temperamentName }}</h1>
     <svg class="game">
+      <rect
+        :x="center.x - 2.5"
+        :y="center.y - 2.5"
+        width="5"
+        height="5"
+        stroke="blue"
+        fill-opacity="0"
+      ></rect>
+      <rect
+        :x="center.x - 2.5"
+        :y="center.y - 2.5"
+        width="5"
+        height="5"
+        stroke="blue"
+        fill-opacity="0"
+        :transform="'rotate(45,' + center.x + ',' + center.y + ')'"
+      ></rect>
       <line
         v-for="(line, index) of lines"
         :key="index"
